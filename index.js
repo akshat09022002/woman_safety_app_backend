@@ -1,17 +1,18 @@
 const express = require('express');
 const cors = require('cors');
-const { urlRoute } = require('./routes/url');
-const { userRoute } = require('./routes/user');
-const cookieParser = require('cookie-parser');
-
+const http = require('http');
+const authMiddleware = require('./middleware/authMiddleware'); 
+const { initializeRoutes } = require('./routes/userRoutes'); 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
+
+const server = http.createServer(app);
 
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors());
-app.use('/user', userRoute);
-app.use('/tinyurl', urlRoute);
+
+initializeRoutes(app);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

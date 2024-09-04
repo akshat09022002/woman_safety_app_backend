@@ -35,6 +35,7 @@ const initializeWebSocket = (server) => {
         ws.send("hi")
       }
 
+      //yaha pe action trigger karna h after every login 
       if (data.action === "updateLocation") {
         await User.findOneAndUpdate(
           { _id: ws.userId },
@@ -88,7 +89,9 @@ const initializeWebSocket = (server) => {
           });
         });
 
-      } else if(data.action === "broadcast"){
+      } 
+      //make a component which is like component {attributes it will contain are: name, location, two buttons[ignore, help]}
+      else if(data.action === "broadcast"){
         broadcast(JSON.stringify({
           from: ws.userId,
           message: data.message
