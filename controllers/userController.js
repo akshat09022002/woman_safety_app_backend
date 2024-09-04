@@ -1,11 +1,16 @@
-const User = require("../schemas/schema").User;
-const HelpSession = require("../schemas/schema").HelpSession;
+const express=require('express');
+const {User,HelpSession} = require("../schemas/schema");
 const jwt = require("jsonwebtoken");
 const axios = require('axios');
 const fast2sms = require("fast-two-sms");
 
+
+const app=express();
+app.use(express.json());
+
+const router=express.Router();
 // Find nearby people within a 1 km radius
-const findNearbyPeople = async (req, res) => {
+router.get('/find-nearby',async (req, res) => { 
   const { longitude, latitude } = req.query;
 
   try {
@@ -30,10 +35,10 @@ const findNearbyPeople = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+});
 
 // Send SMS to emergency contacts and nearby people
-const sendSMS = async (req, res) => {
+router.post('/send-sms',async (req, res) => { 
   const { userId, message } = req.body;
 
   try {
@@ -57,28 +62,39 @@ const sendSMS = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+});
 
 // User signup
-const signup = async (req, res) => {
-  const { name, email, password, phoneNo } = req.body;
-
+router.post('/signup',async (req, res) => { 
+  const { name, email, password, phoneNo } =await req.body;
+  console.log(name);
+ 
   try {
-    const user = new User({ name, email, password, phoneNo });
+    
+    const locationResponse = await axios.get('https://ipapi.co/json/');
+    const locationData = locationResponse.data;
+    console.log(locationData, "location");
+
+   
+    const location = {
+      type: 'Point',
+      coordinates: [parseFloat(locationData.longitude), parseFloat(locationData.latitude)]
+    };
+
+    
+    const user = new User({ name, email, password, phoneNo, location });
     await user.save();
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-
-    res.status(201).json({ token });
+    res.status(201).json({ 
+      msg:'Signup Successful'
+     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+});
 
 // User login
-const login = async (req, res) => {
+router.post('/login',async (req, res) => { 
   const { email, password } = req.body;
 
   try {
@@ -131,10 +147,10 @@ const login = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 
-};
+});
 
 //creating the first user
-const createFirstUser = async (req, res) => {
+router.get('/create-first-router',async (req, res) => { 
   const { name, email, password, phoneNo, gender } = req.body;
 
   try {
@@ -177,14 +193,16 @@ const createFirstUser = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+});
+
+router.get('/try',async(req,res)=>{
+  return res.status(200).json({
+    msg:"hii there"
+  })
+})
 
 // logout ki api aur usko click karte hi socket close kardena
 
 module.exports = {
-  findNearbyPeople,
-  sendSMS,
-  signup,
-  login,
-  createFirstUser,
+  userRoute: router
 };
