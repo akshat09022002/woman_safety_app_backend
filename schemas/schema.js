@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const DBkey = process.env.MongooseURI;
+const DBkey = "mongodb+srv://akshatkindle:Aisehi%401234@akbase.zt293q8.mongodb.net/wsapp";
 
 mongoose.connect(DBkey);
 
@@ -27,6 +27,7 @@ userSchema.index({ location: "2dsphere" });
 
 const helpSessionSchema = new mongoose.Schema({
     victimId: { type: String, required: true },
+    name: { type: String},
     location: {
       type: { type: String, enum: ["Point"], required: true },
       coordinates: { type: [Number], required: true },
@@ -42,7 +43,13 @@ const helpSessionSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
   });
 
+  helpSessionSchema.index({ location: '2dsphere' });
+
 const HelpSession = mongoose.model("HelpSession", helpSessionSchema);
 const User = mongoose.model("User", userSchema);
 
-export default { HelpSession, User };
+module.exports = {
+  HelpSession,
+  User
+};
+
