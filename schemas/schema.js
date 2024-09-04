@@ -34,6 +34,7 @@ const helpSessionSchema = new mongoose.Schema({
     },
     acceptors: [{ 
       userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      acceptedAt: {type: Date },
       verified: { type: Boolean, default: false } 
     }],
     helpers: [{ 
@@ -41,6 +42,7 @@ const helpSessionSchema = new mongoose.Schema({
       acceptedAt: Date 
     }],
     timestamp: { type: Date, default: Date.now },
+    isClosed: { type: Boolean, default: false },
   });
 
   helpSessionSchema.index({ location: '2dsphere' });
