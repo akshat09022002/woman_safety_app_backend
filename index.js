@@ -1,19 +1,15 @@
 const express = require('express');
 const cors = require('cors');
-const http = require('http');
-const authMiddleware = require('./middleware/authMiddleware'); 
-const { initializeRoutes } = require('./routes/userRoutes'); 
-const app = express();
-const PORT = 3000;
+const {userRoute} = require('./controllers/userController')
 
-const server = http.createServer(app);
+const app = express();
+const PORT = 5000;
 
 app.use(express.json());
-app.use(cookieParser());
 app.use(cors());
 
-initializeRoutes(app);
+app.use('/api/v1/user',userRoute);
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`http is running on port ${PORT}`);
 });
