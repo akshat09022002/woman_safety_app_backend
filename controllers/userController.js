@@ -103,6 +103,7 @@ router.post('/send-sms',async (req, res) => {
   }
 });
 
+//add contact route
 router.post('/add-contact',async (req,res)=>{
   const {userId,name,number} = req.body;
 
