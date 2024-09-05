@@ -66,8 +66,7 @@ router.post('/send-sms',async (req, res) => {
 
 // User signup
 router.post('/signup',async (req, res) => { 
-  const { name, email, password, phoneNo } =await req.body;
-  console.log(name);
+  const { name, email, password, phoneNo, gender } =await req.body;
  
   try {
     
@@ -82,7 +81,8 @@ router.post('/signup',async (req, res) => {
     };
 
     
-    const user = new User({ name, email, password, phoneNo, location });
+    const user = new User({ name, email, password, phoneNo, gender, location });
+    
     await user.save();
 
     res.status(201).json({ 
@@ -96,57 +96,28 @@ router.post('/signup',async (req, res) => {
 // User login
 router.post('/login',async (req, res) => { 
   const { email, password } = req.body;
-
   try {
     const user = await User.findOne({ email });
-
-    if (!user || user.password !== password) {
+    if (!user || user.password != password) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
+    else
+    {
+      return res.status(201).json({msg:"Logged in successfully!"});
+    }
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 
-    // Connect to the WebSocket server
-    const socket =  new WebSocket("ws://localhost:3000");
+});
 
-    // Handle WebSocket connection
-    socket.onopen = () => {
-        console.log("Connected to WebSocket server");
-
-      // Function to fetch location and emit to the socket
-      const fetchAndSendLocation = () => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-
-            // Emit location data to the WebSocket server
-            socket.send(JSON.stringify({ latitude, longitude }));
-            console.log("Location sent:", { latitude, longitude })
-
-            // Schedule the next location fetch
-            setTimeout(fetchAndSendLocation, 30000); // 30 seconds
-          },
-          (error) => {
-            console.error("Error fetching location:", error);
-          }
-        );
-      };
-
-      // Start fetching and sending location
-      fetchAndSendLocation();
-    };
-
-    // Handle WebSocket connection error
-    socket.onerror("connect_error", (error) => {
-      console.error("WebSocket connection error:", error);
-    });
-
-    socket.onclose = () => {
-        console.log("WebSocket connection closed");
-      };
-      
+//User Logout
+router.post('/logout', async (req, res) => {
+  try {
+    res.status(200).json({ message: "Logged out successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-
 });
 
 //creating the first user
