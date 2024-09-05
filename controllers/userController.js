@@ -9,33 +9,70 @@ const app=express();
 app.use(express.json());
 
 const router=express.Router();
-// Find nearby people within a 1 km radius
-router.get('/find-nearby',async (req, res) => { 
-  const { longitude, latitude } = req.query;
 
+
+
+// Find nearby people within a 1 km radius
+router.get('/find-nearby', async (req, res) => {
   try {
+    // Fetch the current location using Google Maps Geolocation API
+    const locationResponse = await axios.post('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
+    
+    // Ensure the location data contains the required fields
+    const { lat, lng } = locationResponse.data.location || {};
+    if (!lat || !lng) {
+      return res.status(500).json({ error: "Unable to fetch current location" });
+    }
+
+    const currentLocation = {
+      type: 'Point',
+      coordinates: [lng, lat] // Note: [lng, lat] order is used in GeoJSON
+    };
+
+    // Query the database for nearby users
     const nearbyUsers = await User.aggregate([
       {
         $geoNear: {
-          near: {
-            type: "Point",
-            coordinates: [parseFloat(longitude), parseFloat(latitude)],
-          },
+          near: currentLocation, 
           distanceField: "distance",
-          maxDistance: 1000, // 1 km radius
           spherical: true,
         },
       },
       {
-        $sort: { distance: 1 },
+        $match: {
+          distance: { $lte: 1000 }, 
+        },
+      },
+      {
+        $group: {
+          _id: "$gender", 
+          count: { $sum: 1 }, 
+        },
       },
     ]);
 
-    res.json({ nearbyUsers });
+    const genderCounts = {
+      male: 0,
+      female: 0,
+    };
+
+    // Populate male and female counts
+    nearbyUsers.forEach((user) => {
+      if (user._id === "male") {
+        genderCounts.male = user.count;
+      } else if (user._id === "female") {
+        genderCounts.female = user.count;
+      }
+    });
+
+    res.json({ genderCounts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+module.exports = router;
+
 
 // Send SMS to emergency contacts and nearby people
 router.post('/send-sms',async (req, res) => { 
@@ -65,33 +102,34 @@ router.post('/send-sms',async (req, res) => {
 });
 
 // User signup
-router.post('/signup',async (req, res) => { 
-  const { name, email, password, phoneNo, gender } =await req.body;
- 
-  try {
-    
-    const locationResponse = await axios.get('https://ipapi.co/json/');
-    const locationData = locationResponse.data;
-    console.log(locationData, "location");
+router.post('/signup', async (req, res) => {
+  const { name, email, password, phoneNo, gender } = req.body;
 
-   
+  try {
+    // Fetch location using Google Maps Geolocation API
+    const locationResponse = await axios.post('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
+    console.log(locationResponse);
+
+    // Handle location data
     const location = {
       type: 'Point',
-      coordinates: [parseFloat(locationData.longitude), parseFloat(locationData.latitude)]
+      coordinates: [
+        parseFloat(locationResponse.data.location.lng), // Longitude
+        parseFloat(locationResponse.data.location.lat)  // Latitude
+      ]
     };
 
-    
+    // Create and save the user
     const user = new User({ name, email, password, phoneNo, gender, location });
-    
     await user.save();
 
-    res.status(201).json({ 
-      msg:'Signup Successful'
-     });
+    res.status(201).json({ msg: 'Signup Successful' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+
 
 // User login
 router.post('/login',async (req, res) => { 
@@ -103,7 +141,7 @@ router.post('/login',async (req, res) => {
     }
     else
     {
-      return res.status(201).json({msg:"Logged in successfully!"});
+      return res.status(201).json({msg:"Logged in successfully!" ,userId: user._id });
     }
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -120,59 +158,6 @@ router.post('/logout', async (req, res) => {
   }
 });
 
-//creating the first user
-router.get('/create-first-router',async (req, res) => { 
-  const { name, email, password, phoneNo, gender } = req.body;
-
-  try {
-    // Check if any users exist in the database
-    const existingUsers = await User.countDocuments();
-
-    if (existingUsers > 0) {
-      return res
-        .status(403)
-        .json({ error: "The first user has already been created." });
-    }
-
-    const locationResponse = await axios.get('https://ipapi.co/json/');
-    const locationData = locationResponse.data;
-    console.log(locationData, "location");
-
-    const currentLocation = {
-      type: 'Point',
-      coordinates: [locationData.longitude, locationData.latitude] // Use the fetched longitude and latitude
-    };
-
-
-
-    // Create the first user
-    const user = await User.create({
-        name,
-        email,
-        password,
-        phoneNo,
-        gender,
-        location:currentLocation
-      });
-      
-    
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-
-    res.status(201).json({ message: "First user created successfully", token });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/try',async(req,res)=>{
-  return res.status(200).json({
-    msg:"hii there"
-  })
-})
-
-// logout ki api aur usko click karte hi socket close kardena
 
 module.exports = {
   userRoute: router
