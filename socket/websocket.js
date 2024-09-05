@@ -62,36 +62,41 @@ const initializeWebSocket = (server) => {
               type: "Point",
               coordinates: [data.longitude, data.latitude],
             },
-          }
+          } 
         );
         console.log("Location updated for user:", ws.userId);
       } else if (data.action === "panic") {
-        console.log(data);
+
+        const user= await User.findOne({
+          _id:ws.userId
+        })
+        console.log("panic from ",ws.userId);
+
         const helpSession = await HelpSession.create({
           victimId: ws.userId,
-          name: data.name,
+          name: user.name,
           location: {
             type: "Point",
-            coordinates: [Number(data.longitude), Number(data.latitude)],
+            coordinates: [user.location.coordinates[0], user.location.coordinates[1]],
           },
         });
 
-        // const nearbyUsers = await User.aggregate([
-        //   {
-        //     $geoNear: {
-        //       near: {
-        //         type: "Point",
-        //         coordinates: [data.longitude, data.latitude],
-        //       },
-        //       distanceField: "distance",
-        //       maxDistance: 1000, // 1 km radius
-        //       spherical: true,
-        //     },
-        //   },
-        //   {
-        //     $sort: { distance: 1 }, // Sort by distance ascending (closest users first)
-        //   },
-        // ]);
+        const nearbyUsers = await User.aggregate([
+          {
+            $geoNear: {
+              near: {
+                type: "Point",
+                coordinates: [user.location.coordinates[0], user.location.coordinates[1]],
+              },
+              distanceField: "distance",
+              maxDistance: 1000, // 1 km radius
+              spherical: true,
+            },
+          },
+          {
+            $sort: { distance: 1 }, // Sort by distance ascending (closest users first)
+          },
+        ]);
         
 
         // nearbyUsers.forEach((user) => {
@@ -99,17 +104,17 @@ const initializeWebSocket = (server) => {
             if (
               client.readyState === WebSocket.OPEN &&
               // client.userId.toString() === user._id.toString()
-              client.userId=== data._id
+              client.userId != ws.userId
             ) {
               client.send(
                 JSON.stringify({
-                  type: "panicNotification",
+                  type: "help",
                   sessionId: helpSession._id,
                   name: helpSession.name,
                   victimId: ws.userId,
                   location: {
                     type: "Point",
-                    coordinates: [data.longitude, data.latitude],
+                    coordinates: [user.location.coordinates[0], user.location.coordinates[1]],
                   },
                 })
               );
@@ -138,7 +143,7 @@ const initializeWebSocket = (server) => {
 
         // Start broadcasting the victim's location every 30 seconds
         startBroadcastInterval(ws, result.victimId, result._id);
-      }
+      } 
     });
 
     ws.on("close", () => {
@@ -148,5 +153,5 @@ const initializeWebSocket = (server) => {
 };
 
 module.exports = {
-  initializeWebSocket,
+  initializeWebSocket, 
 };
