@@ -16,17 +16,17 @@ const router=express.Router();
 router.get('/find-nearby', async (req, res) => {
   try {
 
-    const locationResponse = await axios.get('https://ipapi.co/json/');
-    const locationData = locationResponse.data;
+    const locationResponse = await axios.get('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
+   
 
     // Ensure the location data contains the required fields
-    if (!locationData || !locationData.longitude || !locationData.latitude) {
+    if (!locationResponse || !locationResponse.location.lat || !locationResponse.location.lng) {
       return res.status(500).json({ error: "Unable to fetch current location" });
     }
 
     const currentLocation = {
       type: 'Point',
-      coordinates: [locationData.longitude, locationData.latitude] 
+      coordinates: [locationResponse.location.lat, locationResponse.location.lng] 
     };
 
     const nearbyUsers = await User.aggregate([
@@ -105,14 +105,13 @@ router.post('/signup',async (req, res) => {
  
   try {
     
-    const locationResponse = await axios.get('https://ipapi.co/json/');
-    const locationData = locationResponse.data;
-    console.log(locationData, "location");
+    const locationResponse = await axios.get('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
+    console.log(locationResponse, "location");
 
    
     const location = {
       type: 'Point',
-      coordinates: [parseFloat(locationData.longitude), parseFloat(locationData.latitude)]
+      coordinates: [parseFloat(locationResponse.location.lat), parseFloat(locationResponse.location.lng)]
     };
 
     
