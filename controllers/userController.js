@@ -1,39 +1,79 @@
-const User = require("../schemas/schema").User;
-const HelpSession = require("../schemas/schema").HelpSession;
+const express=require('express');
+const {User,HelpSession} = require("../schemas/schema");
 const jwt = require("jsonwebtoken");
 const axios = require('axios');
 const fast2sms = require("fast-two-sms");
 
-// Find nearby people within a 1 km radius
-const findNearbyPeople = async (req, res) => {
-  const { longitude, latitude } = req.query;
 
+const app=express();
+app.use(express.json());
+
+const router=express.Router();
+
+
+
+// Find nearby people within a 1 km radius
+router.get('/find-nearby', async (req, res) => {
   try {
+
+    const locationResponse = await axios.get('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
+   
+
+    // Ensure the location data contains the required fields
+    if (!locationResponse || !locationResponse.location.lat || !locationResponse.location.lng) {
+      return res.status(500).json({ error: "Unable to fetch current location" });
+    }
+
+    const currentLocation = {
+      type: 'Point',
+      coordinates: [locationResponse.location.lat, locationResponse.location.lng] 
+    };
+
     const nearbyUsers = await User.aggregate([
       {
         $geoNear: {
-          near: {
-            type: "Point",
-            coordinates: [parseFloat(longitude), parseFloat(latitude)],
-          },
+          near: currentLocation, 
           distanceField: "distance",
-          maxDistance: 1000, // 1 km radius
           spherical: true,
         },
       },
       {
-        $sort: { distance: 1 },
+        $match: {
+          distance: { $lte: 1000 }, 
+        },
+      },
+      {
+        $group: {
+          _id: "$gender", 
+          count: { $sum: 1 }, 
+        },
       },
     ]);
 
-    res.json({ nearbyUsers });
+    const genderCounts = {
+      male: 0,
+      female: 0,
+    };
+
+    // Populate male and female counts
+    nearbyUsers.forEach((user) => {
+      if (user._id === "male") {
+        genderCounts.male = user.count;
+      } else if (user._id === "female") {
+        genderCounts.female = user.count;
+      }
+    });
+
+    res.json({ genderCounts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+});
+
+
 
 // Send SMS to emergency contacts and nearby people
-const sendSMS = async (req, res) => {
+router.post('/send-sms',async (req, res) => { 
   const { userId, message } = req.body;
 
   try {
@@ -57,134 +97,64 @@ const sendSMS = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+});
 
 // User signup
-const signup = async (req, res) => {
-  const { name, email, password, phoneNo } = req.body;
-
+router.post('/signup',async (req, res) => { 
+  const { name, email, password, phoneNo, gender } =await req.body;
+ 
   try {
-    const user = new User({ name, email, password, phoneNo });
+    
+    const locationResponse = await axios.get('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
+    console.log(locationResponse, "location");
+
+   
+    const location = {
+      type: 'Point',
+      coordinates: [parseFloat(locationResponse.location.lat), parseFloat(locationResponse.location.lng)]
+    };
+
+    
+    const user = new User({ name, email, password, phoneNo, gender, location });
+    
     await user.save();
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-
-    res.status(201).json({ token });
+    res.status(201).json({ 
+      msg:'Signup Successful'
+     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+});
 
 // User login
-const login = async (req, res) => {
+router.post('/login',async (req, res) => { 
   const { email, password } = req.body;
-
   try {
     const user = await User.findOne({ email });
-
-    if (!user || user.password !== password) {
+    if (!user || user.password != password) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
-
-    // Connect to the WebSocket server
-    const socket =  new WebSocket("ws://localhost:3000");
-
-    // Handle WebSocket connection
-    socket.onopen = () => {
-        console.log("Connected to WebSocket server");
-
-      // Function to fetch location and emit to the socket
-      const fetchAndSendLocation = () => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-
-            // Emit location data to the WebSocket server
-            socket.send(JSON.stringify({ latitude, longitude }));
-            console.log("Location sent:", { latitude, longitude })
-
-            // Schedule the next location fetch
-            setTimeout(fetchAndSendLocation, 30000); // 30 seconds
-          },
-          (error) => {
-            console.error("Error fetching location:", error);
-          }
-        );
-      };
-
-      // Start fetching and sending location
-      fetchAndSendLocation();
-    };
-
-    // Handle WebSocket connection error
-    socket.onerror("connect_error", (error) => {
-      console.error("WebSocket connection error:", error);
-    });
-
-    socket.onclose = () => {
-        console.log("WebSocket connection closed");
-      };
-      
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-
-};
-
-//creating the first user
-const createFirstUser = async (req, res) => {
-  const { name, email, password, phoneNo, gender } = req.body;
-
-  try {
-    // Check if any users exist in the database
-    const existingUsers = await User.countDocuments();
-
-    if (existingUsers > 0) {
-      return res
-        .status(403)
-        .json({ error: "The first user has already been created." });
+    else
+    {
+      return res.status(201).json({msg:"Logged in successfully!" ,userId: user._id });
     }
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 
-    const locationResponse = await axios.get('https://ipapi.co/json/');
-    const locationData = locationResponse.data;
-    console.log(locationData, "location");
+});
 
-    const currentLocation = {
-      type: 'Point',
-      coordinates: [locationData.longitude, locationData.latitude] // Use the fetched longitude and latitude
-    };
-
-
-
-    // Create the first user
-    const user = await User.create({
-        name,
-        email,
-        password,
-        phoneNo,
-        gender,
-        location:currentLocation
-      });
-      
-    
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-
-    res.status(201).json({ message: "First user created successfully", token });
+//User Logout
+router.post('/logout', async (req, res) => {
+  try {
+    res.status(200).json({ message: "Logged out successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+});
 
-// logout ki api aur usko click karte hi socket close kardena
 
 module.exports = {
-  findNearbyPeople,
-  sendSMS,
-  signup,
-  login,
-  createFirstUser,
+  userRoute: router
 };
