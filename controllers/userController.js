@@ -15,20 +15,21 @@ const router=express.Router();
 // Find nearby people within a 1 km radius
 router.get('/find-nearby', async (req, res) => {
   try {
-
-    const locationResponse = await axios.get('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
-   
-
+    // Fetch the current location using Google Maps Geolocation API
+    const locationResponse = await axios.post('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
+    
     // Ensure the location data contains the required fields
-    if (!locationResponse || !locationResponse.location.lat || !locationResponse.location.lng) {
+    const { lat, lng } = locationResponse.data.location || {};
+    if (!lat || !lng) {
       return res.status(500).json({ error: "Unable to fetch current location" });
     }
 
     const currentLocation = {
       type: 'Point',
-      coordinates: [locationResponse.location.lat, locationResponse.location.lng] 
+      coordinates: [lng, lat] // Note: [lng, lat] order is used in GeoJSON
     };
 
+    // Query the database for nearby users
     const nearbyUsers = await User.aggregate([
       {
         $geoNear: {
@@ -70,6 +71,7 @@ router.get('/find-nearby', async (req, res) => {
   }
 });
 
+module.exports = router;
 
 
 // Send SMS to emergency contacts and nearby people
@@ -100,32 +102,34 @@ router.post('/send-sms',async (req, res) => {
 });
 
 // User signup
-router.post('/signup',async (req, res) => { 
-  const { name, email, password, phoneNo, gender } =await req.body;
- 
-  try {
-    
-    const locationResponse = await axios.get('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
-    console.log(locationResponse, "location");
+router.post('/signup', async (req, res) => {
+  const { name, email, password, phoneNo, gender } = req.body;
 
-   
+  try {
+    // Fetch location using Google Maps Geolocation API
+    const locationResponse = await axios.post('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
+    console.log(locationResponse);
+
+    // Handle location data
     const location = {
       type: 'Point',
-      coordinates: [parseFloat(locationResponse.location.lat), parseFloat(locationResponse.location.lng)]
+      coordinates: [
+        parseFloat(locationResponse.data.location.lng), // Longitude
+        parseFloat(locationResponse.data.location.lat)  // Latitude
+      ]
     };
 
-    
+    // Create and save the user
     const user = new User({ name, email, password, phoneNo, gender, location });
-    
     await user.save();
 
-    res.status(201).json({ 
-      msg:'Signup Successful'
-     });
+    res.status(201).json({ msg: 'Signup Successful' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+
 
 // User login
 router.post('/login',async (req, res) => { 
