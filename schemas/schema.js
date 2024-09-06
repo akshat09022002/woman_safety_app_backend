@@ -10,7 +10,10 @@ const userSchema = new mongoose.Schema({
   email: { type: String },
   password: { type: String },
   emergencyContacts: [
-    { type: mongoose.Schema.Types.ObjectId, ref: "User"},
+    {
+      name: {type:String},
+      contact:{type: String}
+    }
   ],
   gender: { type: String },
   location: {

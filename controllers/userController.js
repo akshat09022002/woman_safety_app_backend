@@ -76,28 +76,67 @@ module.exports = router;
 
 // Send SMS to emergency contacts and nearby people
 router.post('/send-sms',async (req, res) => { 
-  const { userId, message } = req.body;
-
+  const { userId } = req.body;
+  
   try {
-    const user = await User.findById(userId).populate("emergencyContacts");
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // Send SMS to emergency contacts
-    const phoneNumbers = user.emergencyContacts.map((contact) =>
-      contact.phoneNo.toString()
-    );
-    const response = await fast2sms.sendMessage({
-      authorization: process.env.FAST2SMS_API_KEY,
-      message,
-      numbers: phoneNumbers,
+    const user= await User.findOne({
+      _id: userId
     });
+    if(user){
+      const message=`Urgent assistance required! ${user.name} is in distress and needs immediate help`;
+      const encodedString = message.replace(/ /g, '%20');
+      
+      user.emergencyContacts.map(async (person)=>{
+        const number= parseInt(person.contact,10);
+        const response=await axios.get(`https://www.fast2sms.com/dev/bulkV2?authorization=fn0xZcKjJaQ2DqvRsb1YX6WuGMgt7TAiVB89y4kEel5CSLINPmDyY3Jg2GOkVAmf9CZeLR0H6hXsFxdK&route=q&message=${encodedString}&flash=1&numbers=${number}`);
+        
+      })
 
-    res.json({ message: "SMS sent successfully", response });
+      res.status(200).json({msg:"message sent"});
+    }
+    else{
+      res.status(403).json({msg:"Invalid Request"});
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+//add contact route
+router.post('/add-contact',async (req,res)=>{
+  const {userId,name,number} = req.body;
+
+  try{
+    const user = await User.findOneAndUpdate(
+      { _id: userId },
+      {
+        $push: {
+          emergencyContacts: { name, contact:number }
+        }
+      }
+    );
+
+    if(!user){
+      return res.status(404).json({ message: 'User not found' });
+    }else{
+      res.status(200).json({ message: 'Contacts updated successfully' });
+    }
+  }catch{
+
+  }
+})
+
+
+//route to get the stored contacts
+router.get('/get-contacts/:userId', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ contacts: user.emergencyContacts });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching contacts' });
   }
 });
 
@@ -141,7 +180,7 @@ router.post('/login',async (req, res) => {
     }
     else
     {
-      return res.status(201).json({msg:"Logged in successfully!" ,userId: user._id });
+      return res.status(201).json({msg:"Logged in successfully!" ,userId: user._id,name:user.name});
     }
   } catch (err) {
     return res.status(500).json({ error: err.message });

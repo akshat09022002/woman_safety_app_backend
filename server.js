@@ -1,25 +1,11 @@
-require('dotenv').config(); 
-const express = require('express');
-const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');
 const http = require('http');
-const WebSocketServer = require('./socket/websocket.js');
-const {initializeWebSocket}= require('./socket/websocket.js');
+const WebSocketServer = require('./socket/websocket.js'); // Import the module
 
-
-const app = express();
-app.use(express.json());
-
-// Connect to MongoDB
-mongoose.connect(process.env.DB_KEY || 'mongodb+srv://akshatkindle:Aisehi%401234@akbase.zt293q8.mongodb.net/wsapp', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('WebSocket server running');
 });
 
-// Initialize HTTP server
-const server = http.createServer(app);
-
-// Initialize WebSocket server
 WebSocketServer.initializeWebSocket(server);
 
 server.listen(5173, () => {
