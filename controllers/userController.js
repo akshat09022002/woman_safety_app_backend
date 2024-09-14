@@ -40,7 +40,7 @@ router.get('/find-nearby', async (req, res) => {
       },
       {
         $match: {
-          distance: { $lte: 1000 }, 
+          distance: { $lte: 5000 }, 
         },
       },
       {
