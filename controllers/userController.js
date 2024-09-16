@@ -12,10 +12,8 @@ const router=express.Router();
 
 
 
-// Find nearby people within a 1 km radius
 router.get('/find-nearby', async (req, res) => {
   try {
-    // Fetch the current location using Google Maps Geolocation API
     const locationResponse = await axios.post('https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAtWt9ACf5HMAIoMxxvM6BVoPNaLnzJ1gc');
     
     // Ensure the location data contains the required fields
@@ -29,7 +27,6 @@ router.get('/find-nearby', async (req, res) => {
       coordinates: [lng, lat] // Note: [lng, lat] order is used in GeoJSON
     };
 
-    // Query the database for nearby users
     const nearbyUsers = await User.aggregate([
       {
         $geoNear: {
@@ -40,7 +37,7 @@ router.get('/find-nearby', async (req, res) => {
       },
       {
         $match: {
-          distance: { $lte: 5000 }, 
+          distance: { $lte: 1000 }, 
         },
       },
       {
@@ -56,7 +53,6 @@ router.get('/find-nearby', async (req, res) => {
       female: 0,
     };
 
-    // Populate male and female counts
     nearbyUsers.forEach((user) => {
       if (user._id === "male") {
         genderCounts.male = user.count;
@@ -74,7 +70,6 @@ router.get('/find-nearby', async (req, res) => {
 module.exports = router;
 
 
-// Send SMS to emergency contacts and nearby people
 router.post('/send-sms',async (req, res) => { 
   const { userId } = req.body;
   
@@ -187,6 +182,38 @@ router.post('/login',async (req, res) => {
   }
 
 });
+
+
+//api to delete the user 
+router.delete('/delete-contact/:userId/:contactId', async (req, res) => {
+  const { userId, contactId } = req.params;
+
+  try {
+    // Find the user by ID
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    const contactIndex = user.emergencyContacts.findIndex(
+      (contact) => contact._id.toString() === contactId
+    );
+
+    if (contactIndex === -1) {
+      return res.status(404).json({ msg: 'Contact not found' });
+    }
+
+    user.emergencyContacts.splice(contactIndex, 1);
+
+    await user.save();
+
+    res.status(200).json({ msg: 'Contact deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 //User Logout
 router.post('/logout', async (req, res) => {
